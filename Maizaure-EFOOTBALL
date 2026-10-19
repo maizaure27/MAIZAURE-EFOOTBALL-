@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MAIZAURE ⚽</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #111;
+      font-family: Arial, sans-serif;
+    }
+    #gameArea {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #25782a;
+    }
+
+    /* Scoreboard */
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: rgba(0, 0, 0, 0.85);
+      border: 2px solid #ffd700;
+      border-radius: 20px;
+      padding: 6px 16px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 15px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .score-box { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+    .dot-home { background: #00e676; border: 1px solid #fff; }
+    .dot-away { background: #ff1744; border: 1px solid #fff; }
+    #time { color: #ffd700; font-family: monospace; font-size: 16px; }
+
+    /* Touch Controls Overlay */
+    #touchLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    /* Virtual Joystick */
+    #stickBase {
+      position: absolute;
+      bottom: 25px;
+      left: 25px;
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 2px dashed rgba(255, 255, 255, 0.4);
+      pointer-events: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    #stickKnob {
+      width: 55px;
+      height: 55px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffd700, #ff8f00);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+      transform: translate(0px, 0px);
+      pointer-events: none;
+    }
+
+    /* Buttons */
+    #btnGroup {
+      position: absolute;
+      bottom: 25px;
+      right: 25px;
+      width: 180px;
+      height: 160px;
+      pointer-events: auto;
+    }
+    .action-btn {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      color: #fff;
+      font-weight: 900;
+      font-size: 11px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+      text-shadow: 1px 1px 2px #000;
+      pointer-events: auto;
+    }
+    .action-btn:active { transform: scale(0.9); }
+    #btnShoot  { background: #d50000; top: 0; right: 55px; }
+    #btnPass   { background: #0091ea; bottom: 5px; right: 85px; }
+    #btnSprint { background: #ff6d00; bottom: 15px; right: 10px; }
+
+    /* Goal Announcement */
+    #goalSign {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 50px;
+      font-weight: 900;
+      color: #ffeb3b;
+      text-shadow: 0 0 20px #d50000, 0 4px 10px #000;
+      z-index: 50;
+      pointer-events: none;
+      transition: transform 0.25s ease-out;
+    }
+    #goalSign.show { transform: translate(-50%, -50%) scale(1.2); }
+
+    /* Kick-Off Start Modal */
+    #startModal {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 25, 12, 0.95);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      color: #fff;
+    }
+    #startModal h1 {
+      font-size: 40px;
+      color: #ffd700;
+      margin-bottom: 8px;
+      text-shadow: 0 4px 8px #000;
+    }
+    #startModal p {
+      color: #a7f3d0;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+    #playBtn {
+      padding: 14px 45px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #000;
+      background: linear-gradient(135deg, #ffd700, #ff9100);
+      border: none;
+      border-radius: 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      cursor: pointer;
+    }
+    #playBtn:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+
+<div id="gameArea">
+  <div id="scoreboard">
+    <div class="score-box"><span class="dot dot-home"></span> MAIZAURE <span id="homeScore">0</span></div>
+    <span>:</span>
+    <div class="score-box"><span id="awayScore">0</span> OPPONENT <span class="dot dot-away"></span></div>
+    <div id="time">03:00</div>
+  </div>
+
+  <div id="goalSign">GOAL! ⚽</div>
+
+  <!-- Touch Controls -->
+  <div id="touchLayer">
+    <div id="stickBase">
+      <div id="stickKnob"></div>
+    </div>
+    <div id="btnGroup">
+      <div id="btnShoot" class="action-btn">SHOOT</div>
+      <div id="btnPass" class="action-btn">PASS</div>
+      <div id="btnSprint" class="action-btn">SPRINT</div>
+    </div>
+  </div>
+
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="startModal">
+    <h1>MAIZAURE ⚽</h1>
+    <p>Mobile Android Football</p>
+    <button id="playBtn" onclick="initAndStart()">TAP TO PLAY</button>
+  </div>
+</div>
+
+<script>
+/* Audio Effects Engine (Synthesized, completely offline) */
+const AudioFX = {
+  ctx: null,
+  init() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AC();
+    }
+  },
+  kick() {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.1);
+    g.gain.setValueAtTime(1, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+    osc.connect(g);
+    g.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.1);
+  },
+  whistle() {
+    if (!this.ctx) return;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(2500, this.ctx.currentTime);
+    osc.frequency.setValueAtTime(3000, this.ctx.currentTime + 0.08);
+    g.gain.setValueAtTime(0.3, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+    osc.connect(g);
+    g.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.3);
+  },
+  goal() {
+    if (!this.ctx) return;
+    const len = this.ctx.sampleRate * 1.5;
+    const b = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = this.ctx.createBufferSource();
+    src.buffer = b;
+    const f = this.ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(400, this.ctx.currentTime);
+    f.frequency.linearRampToValueAtTime(1100, this.ctx.currentTime + 0.6);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.6, this.ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 1.5);
+    src.connect(f);
+    f.connect(g);
+    g.connect(this.ctx.destination);
+    src.start();
+  }
+};
+
+/* Canvas & Field Sizing */
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const FIELD_W = 1400;
+const FIELD_H = 900;
+const GOAL_H = 160;
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+/* Camera Tracker */
+const camera = {
+  x: FIELD_W / 2,
+  y: FIELD_H / 2,
+  update(tx, ty) {
+    this.x += (tx - canvas.width / 2 - this.x) * 0.08;
+    this.y += (ty - canvas.height / 2 - this.y) * 0.08;
+    this.x = Math.max(0, Math.min(this.x, FIELD_W - canvas.width));
+    this.y = Math.max(0, Math.min(this.y, FIELD_H - canvas.height));
+  }
+};
+
+/* Ball Object */
+const ball = {
+  x: FIELD_W / 2,
+  y: FIELD_H / 2,
+  z: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
+  radius: 8,
+  carrier: null,
+
+  update() {
+    if (this.carrier) {
+      this.x = this.carrier.x + Math.cos(this.carrier.angle) * 16;
+      this.y = this.carrier.y + Math.sin(this.carrier.angle) * 16;
+      this.z = 0;
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
+
+    this.x += this.vx;
+    this.y += this.vy;
+    this.z += this.vz;
+
+    if (this.z > 0) {
+      this.vz -= 0.35;
+    } else {
+      this.z = 0;
+      this.vz = 0;
+      this.vx *= 0.983;
+      this.vy *= 0.983;
+    }
+
+    // Walls
+    if (this.y < 30) { this.y = 30; this.vy *= -0.7; }
+    if (this.y > FIELD_H - 30) { this.y = FIELD_H - 30; this.vy *= -0.7; }
+
+    const topGoal = (FIELD_H - GOAL_H) / 2;
+    const btmGoal = (FIELD_H + GOAL_H) / 2;
+
+    // Left Goal
+    if (this.x < 30) {
+      if (this.y > topGoal && this.y < btmGoal) {
+        if (!isGoal) scoreGoal('away');
+      } else {
+        this.x = 30;
+        this.vx *= -0.7;
+      }
+    }
+
+    // Right Goal
+    if (this.x > FIELD_W - 30) {
+      if (this.y > topGoal && this.y < btmGoal) {
+        if (!isGoal) scoreGoal('home');
+      } else {
+        this.x = FIELD_W - 30;
+        this.vx *= -0.7;
+      }
+    }
+  },
+
+  draw(c) {
+    // Ball Shadow
+    c.beginPath();
+    c.arc(this.x, this.y, Math.max(2, this.radius - this.z * 0.1), 0, Math.PI * 2);
+    c.fillStyle = "rgba(0,0,0,0.25)";
+    c.fill();
+
+    // Ball Sphere
+    c.beginPath();
+    c.arc(this.x, this.y - this.z, this.radius, 0, Math.PI * 2);
+    c.fillStyle = "#ffffff";
+    c.fill();
+    c.lineWidth = 1.5;
+    c.strokeStyle = "#111";
+    c.stroke();
+  }
+};
+
+/* Player Class */
+class Player {
+  constructor(x, y, team, isGK = false) {
+    this.baseX = x;
+    this.baseY = y;
+    this.x = x;
+    this.y = y;
+    this.team = team;
+    this.isGK = isGK;
+    this.radius = 15;
+    this.speed = 3.6;
+    this.angle = team === 'home' ? 0 : Math.PI;
+    this.isControlled = false;
+    this.sprinting = false;
+  }
+
+  update() {
+    let curSpeed = (this.isControlled && this.sprinting) ? 5.4 : this.speed;
+
+    if (this.isControlled) {
+      if (joy.active) {
+        this.angle = Math.atan2(joy.y, joy.x);
+        this.x += joy.x * curSpeed;
+        this.y += joy.y * curSpeed;
+      }
+    } else {
+      this.updateAI();
+    }
+
+    // Pitch bounds
+    this.x = Math.max(30, Math.min(this.x, FIELD_W - 30));
+    this.y = Math.max(30, Math.min(this.y, FIELD_H - 30));
+
+    // Pickup ball
+    if (!ball.carrier && ball.z < 10) {
+      const d = Math.hypot(this.x - ball.x, this.y - ball.y);
+      if (d < this.radius + ball.radius + 4) {
+        ball.carrier = this;
+        AudioFX.kick();
+      }
+    }
+  }
+
+  updateAI() {
+    if (this.isGK) {
+      const minGoal = (FIELD_H - GOAL_H) / 2 + 15;
+      const maxGoal = (FIELD_H + GOAL_H) / 2 - 15;
+      const targetY = Math.max(minGoal, Math.min(ball.y, maxGoal));
+      this.y += (targetY - this.y) * 0.08;
+      return;
+    }
+
+    if (this.team === 'away') {
+      const dBall = Math.hypot(this.x - ball.x, this.y - ball.y);
+      if (ball.carrier === this) {
+        this.angle = Math.atan2(FIELD_H / 2 - this.y, 40 - this.x);
+        this.x += Math.cos(this.angle) * this.speed * 0.9;
+        this.y += Math.sin(this.angle) * this.speed * 0.9;
+        if (this.x < 360) kickBall(this, 14, 0.4);
+      } else {
+        if (dBall < 300 || ball.carrier?.team === 'home') {
+          this.angle = Math.atan2(ball.y - this.y, ball.x - this.x);
+          this.x += Math.cos(this.angle) * this.speed * 0.82;
+          this.y += Math.sin(this.angle) * this.speed * 0.82;
+        } else {
+          this.x += (this.baseX - this.x) * 0.02;
+          this.y += (this.baseY - this.y) * 0.02;
+        }
+      }
+    } else {
+      if (ball.carrier !== this) {
+        this.x += (this.baseX - this.x) * 0.02;
+        this.y += (this.baseY - this.y) * 0.02;
+      }
+    }
+  }
+
+  draw(c) {
+    // Shadow
+    c.beginPath();
+    c.arc(this.x, this.y + 4, this.radius, 0, Math.PI * 2);
+    c.fillStyle = "rgba(0,0,0,0.25)";
+    c.fill();
+
+    // Body
+    c.beginPath();
+    c.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    if (this.isGK) {
+      c.fillStyle = this.team === 'home' ? '#ffeb3b' : '#ff9800';
+    } else {
+      c.fillStyle = this.team === 'home' ? '#00e676' : '#ff1744';
+    }
+    c.fill();
+    c.lineWidth = 2.5;
+    c.strokeStyle = '#fff';
+    c.stroke();
+
+    // Pointer
+    c.beginPath();
+    c.moveTo(this.x, this.y);
+    c.lineTo(this.x + Math.cos(this.angle) * (this.radius + 5), this.y + Math.sin(this.angle) * (this.radius + 5));
+    c.strokeStyle = '#fff';
+    c.lineWidth = 2;
+    c.stroke();
+
+    // Controlled Yellow Ring
+    if (this.isControlled) {
+      c.beginPath();
+      c.arc(this.x, this.y, this.radius + 6, 0, Math.PI * 2);
+      c.strokeStyle = '#ffd700';
+      c.lineWidth = 2.5;
+      c.stroke();
+    }
+  }
+}
+
+let players = [];
+
+function setupPlayers() {
+  players = [];
+  // MAIZAURE FC (Green)
+  players.push(new Player(60, FIELD_H / 2, 'home', true));
+  players.push(new Player(320, 260, 'home'));
+  players.push(new Player(320, FIELD_H - 260, 'home'));
+  players.push(new Player(540, FIELD_H / 2, 'home'));
+  players.push(new Player(680, FIELD_H / 2, 'home'));
+
+  // OPPONENTS (Red)
+  players.push(new Player(FIELD_W - 60, FIELD_H / 2, 'away', true));
+  players.push(new Player(FIELD_W - 320, 260, 'away'));
+  players.push(new Player(FIELD_W - 320, FIELD_H - 260, 'away'));
+  players.push(new Player(FIELD_W - 540, FIELD_H / 2, 'away'));
+  players.push(new Player(FIELD_W - 680, FIELD_H / 2, 'away'));
+
+  pickControlledPlayer();
+}
+
+function pickControlledPlayer() {
+  players.forEach(p => p.isControlled = false);
+  const userTeam = players.filter(p => p.team === 'home' && !p.isGK);
+  let best = userTeam[0];
+  let minD = Infinity;
+  userTeam.forEach(p => {
+    let d = Math.hypot(p.x - ball.x, p.y - ball.y);
+    if (d < minD) { minD = d; best = p; }
+  });
+  if (best) best.isControlled = true;
+}
+
+function kickBall(p, power, lift) {
+  ball.carrier = null;
+  ball.vx = Math.cos(p.angle) * power;
+  ball.vy = Math.sin(p.angle) * power;
+  ball.vz = lift;
+  AudioFX.kick();
+}
+
+/* Multi-Touch Controls */
+const joy = { x: 0, y: 0, active: false };
+const stickBase = document.getElementById("stickBase");
+const stickKnob = document.getElementById("stickKnob");
+let stickTouchId = null;
+
+stickBase.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  stickTouchId = t.identifier;
+  moveJoystick(t.clientX, t.clientY);
+}, { passive: false });
+
+window.addEventListener("touchmove", (e) => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === stickTouchId) {
+      moveJoystick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+    }
+  }
+});
+
+function stopJoystick() {
+  stickTouchId = null;
+  joy.x = 0;
+  joy.y = 0;
+  joy.active = false;
+  stickKnob.style.transform = `translate(0px, 0px)`;
+}
+
+window.addEventListener("touchend", (e) => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === stickTouchId) stopJoystick();
+  }
+});
+
+function moveJoystick(tx, ty) {
+  const r = stickBase.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  let dx = tx - cx;
+  let dy = ty - cy;
+  const dist = Math.hypot(dx, dy);
+  const maxR = 40;
+
+  if (dist > maxR) {
+    dx = (dx / dist) * maxR;
+    dy = (dy / dist) * maxR;
+  }
+  stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+  joy.x = dx / maxR;
+  joy.y = dy / maxR;
+  joy.active = dist > 4;
+}
+
+// Action Button Bindings
+function bindBtn(id, onDown, onUp) {
+  const btn = document.getElementById(id);
+  btn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    onDown();
+  }, { passive: false });
+  if (onUp) {
+    btn.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      onUp();
+    }, { passive: false });
+  }
+}
+
+bindBtn("btnShoot", () => {
+  const p = players.find(x => x.isControlled);
+  if (p && ball.carrier === p) kickBall(p, 17, 3.8);
+});
+
+bindBtn("btnPass", () => {
+  const p = players.find(x => x.isControlled);
+  if (p && ball.carrier === p) {
+    const teammates = players.filter(t => t.team === 'home' && t !== p);
+    let best = teammates[0];
+    let minD = Infinity;
+    teammates.forEach(t => {
+      let d = Math.hypot(t.x - p.x, t.y - p.y);
+      if (d < minD) { minD = d; best = t; }
+    });
+    if (best) p.angle = Math.atan2(best.y - p.y, best.x - p.x);
+    kickBall(p, 11, 0.4);
+  }
+});
+
+bindBtn("btnSprint",
+  () => { const p = players.find(x => x.isControlled); if (p) p.sprinting = true; },
+  () => { const p = players.find(x => x.isControlled); if (p) p.sprinting = false; }
+);
+
+/* Field Painting */
+function drawField(c) {
+  const stripe = 90;
+  for (let x = 0; x < FIELD_W; x += stripe) {
+    c.fillStyle = ((x / stripe) % 2 === 0) ? '#2e8533' : '#28792c';
+    c.fillRect(x, 0, stripe, FIELD_H);
+  }
+
+  c.strokeStyle = '#fff';
+  c.lineWidth = 3.5;
+  c.strokeRect(30, 30, FIELD_W - 60, FIELD_H - 60);
+
+  // Center Line & Circle
+  c.beginPath();
+  c.moveTo(FIELD_W / 2, 30);
+  c.lineTo(FIELD_W / 2, FIELD_H - 30);
+  c.stroke();
+
+  c.beginPath();
+  c.arc(FIELD_W / 2, FIELD_H / 2, 85, 0, Math.PI * 2);
+  c.stroke();
+
+  // Penalty Boxes
+  const boxH = 320;
+  const boxW = 140;
+  c.strokeRect(30, (FIELD_H - boxH) / 2, boxW, boxH);
+  c.strokeRect(FIELD_W - 30 - boxW, (FIELD_H - boxH) / 2, boxW, boxH);
+
+  // Goal Nets
+  c.fillStyle = "rgba(255,255,255,0.25)";
+  c.fillRect(5, (FIELD_H - GOAL_H) / 2, 25, GOAL_H);
+  c.strokeRect(5, (FIELD_H - GOAL_H) / 2, 25, GOAL_H);
+  c.fillRect(FIELD_W - 30, (FIELD_H - GOAL_H) / 2, 25, GOAL_H);
+  c.strokeRect(FIELD_W - 30, (FIELD_H - GOAL_H) / 2, 25, GOAL_H);
+}
+
+/* Match Loop & Scoring */
+let homeScore = 0;
+let awayScore = 0;
+let isGoal = false;
+let isPlaying = false;
+let timer = 180;
+let interval = null;
+
+function scoreGoal(team) {
+  isGoal = true;
+  if (team === 'home') homeScore++;
+  else awayScore++;
+
+  document.getElementById("homeScore").textContent = homeScore;
+  document.getElementById("awayScore").textContent = awayScore;
+
+  AudioFX.whistle();
+  AudioFX.goal();
+
+  const sign = document.getElementById("goalSign");
+  sign.classList.add("show");
+
+  setTimeout(() => {
+    sign.classList.remove("show");
+    resetAfterGoal();
+    isGoal = false;
+  }, 2200);
+}
+
+function resetAfterGoal() {
+  ball.carrier = null;
+  ball.x = FIELD_W / 2;
+  ball.y = FIELD_H / 2;
+  ball.vx = ball.vy = ball.vz = 0;
+  players.forEach(p => {
+    p.x = p.baseX;
+    p.y = p.baseY;
+  });
+  pickControlledPlayer();
+}
+
+function gameLoop() {
+  if (isPlaying) {
+    ball.update();
+    players.forEach(p => p.update());
+
+    if (!ball.carrier && Math.random() < 0.05) {
+      pickControlledPlayer();
+    }
+
+    camera.update(ball.x, ball.y);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    drawField(ctx);
+    players.forEach(p => p.draw(ctx));
+    ball.draw(ctx);
+
+    ctx.restore();
+  }
+  requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+function initAndStart() {
+  AudioFX.init();
+  AudioFX.whistle();
+  document.getElementById("startModal").style.display = "none";
+  setupPlayers();
+  isPlaying = true;
+
+  if (interval) clearInterval(interval);
+  timer = 180;
+  interval = setInterval(() => {
+    if (isPlaying && !isGoal) {
+      timer--;
+      let m = Math.floor(timer / 60);
+      let s = timer % 60;
+      document.getElementById("time").textContent = 
+        `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+      if (timer <= 0) {
+        clearInterval(interval);
+        alert(`Full Time!\nMAIZAURE ${homeScore} - ${awayScore} OPPONENT`);
+        document.getElementById("startModal").style.display = "flex";
+    
